@@ -1,43 +1,38 @@
 package org.example;
 
-//package com.labs.reflection.injector;
-
-import reflection.SomeInterface;
-import reflection.SomeOtherInterface;
-import reflection.SomeImpl;
-import reflection.SODoer;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.lang.reflect.Field;
+import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class InjectorTest {
 
-    private Injector<SomeBean> injector;
+    @Test
+    void testSuccessfulInjection() throws Exception {
+        File propertiesFile = File.createTempFile("conf", ".properties");
+        propertiesFile.deleteOnExit();
 
-    @BeforeEach
-    public void setUp() throws Exception {
-        // Создаем временный файл с конфигурацией
-        String configContent = "org.example.SomeInterface=org.example.SomeImpl\n" +
-                "org.example.SomeOtherInterface=org.example.SODoer";
-        Path tempFile = Files.createTempFile("config", ".properties");
-        Files.write(tempFile, configContent.getBytes(StandardCharsets.UTF_8));
+        Properties properties = new Properties();
+        properties.setProperty("reflection.SomeInterface", "reflection.SomeImpl");
+        properties.setProperty("reflection.SomeOtherInterface", "reflection.SODoer");
+        try (FileOutputStream out = new FileOutputStream(propertiesFile)) {
+            properties.store(out, null);
+        }
+        SomeBean testObject = new SomeBean();
+        Injector<SomeBean> injector = new Injector<>(propertiesFile.getAbsolutePath());
 
-        // Инициализируем Injector с временным файлом
-        injector = new Injector<>(tempFile.toString());
+        injector.inject(testObject);
+        assertNotNull(getFieldValue(testObject, "field1"), "Dependency was not injected for field1");
+        assertNotNull(getFieldValue(testObject, "field2"), "Dependency was not injected for field2");
     }
 
-
-
-
-    private static class TestBean {
-        @AutoInjectable
-        private SomeInterface someInterface;
-        @AutoInjectable
-        private SomeOtherInterface someOtherInterface;
+    private Object getFieldValue(Object obj, String fieldName) throws NoSuchFieldException, IllegalAccessException {
+        Field field = obj.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(obj);
     }
 }
